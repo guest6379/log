@@ -3,8 +3,11 @@
 package log
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -34,4 +37,27 @@ func CrashLog(file string) {
 			log.Println(err.Error())
 		}
 	}
+}
+
+func SetConsoleColor(t LogType) string {
+	mod := syscall.NewLazyDLL("kernel32.dll")
+	SetConsoleTextAttribute := mod.NewProc("SetConsoleTextAttribute")
+	getStdHandler, _ := syscall.GetStdHandle(-11)
+
+	logStr, logColor := LogTypeToString(t)
+	colorAttribute, err := strconv.ParseInt(strings.Replace(logColor, "0x", "", -1), 16, 64)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	// set console color
+	SetConsoleTextAttribute.Call(uintptr(getStdHandler), uintptr(colorAttribute))
+	return logStr
+}
+
+func ResetConsoleColor() {
+	mod := syscall.NewLazyDLL("kernel32.dll")
+	SetConsoleTextAttribute := mod.NewProc("SetConsoleTextAttribute")
+	getStdHandler, _ := syscall.GetStdHandle(-11)
+	SetConsoleTextAttribute.Call(uintptr(getStdHandler), uintptr(0x07))
 }

@@ -50,7 +50,7 @@ var _log *logger = New()
 
 func init() {
 	SetFlags(Ldate | Ltime | Lshortfile)
-	SetHighlighting(runtime.GOOS != "windows")
+	//	SetHighlighting(runtime.GOOS != "windows")
 }
 
 func Logger() *log.Logger {
@@ -250,20 +250,38 @@ func (l *logger) log(t LogType, v ...interface{}) {
 		return
 	}
 
-	v1 := make([]interface{}, len(v)+2)
-	logStr, logColor := LogTypeToString(t)
 	if l.highlighting {
-		v1[0] = "\033" + logColor + "m[" + logStr + "]"
-		copy(v1[1:], v)
-		v1[len(v)+1] = "\033[0m"
+		switch runtime.GOOS {
+		case "windows":
+			v1 := make([]interface{}, len(v)+1)
+			logStr := SetConsoleColor(t)
+			v1[0] = "[" + logStr + "]"
+			copy(v1[1:], v)
+			s := fmt.Sprintln(v1...)
+			l._log.Output(4, s)
+
+			// reset console color
+			ResetConsoleColor()
+		default:
+			v1 := make([]interface{}, len(v)+2)
+			logStr, logColor := LogTypeToString(t)
+			v1[0] = "\033" + logColor + "m[" + logStr + "]"
+			copy(v1[1:], v)
+			v1[len(v)+1] = "\033[0m"
+			s := fmt.Sprintln(v1...)
+			l._log.Output(4, s)
+		}
+
 	} else {
+		v1 := make([]interface{}, len(v)+2)
+		logStr, _ := LogTypeToString(t)
 		v1[0] = "[" + logStr + "]"
 		copy(v1[1:], v)
 		v1[len(v)+1] = ""
+		s := fmt.Sprintln(v1...)
+		l._log.Output(4, s)
 	}
 
-	s := fmt.Sprintln(v1...)
-	l._log.Output(4, s)
 }
 
 func (l *logger) logf(t LogType, format string, v ...interface{}) {
@@ -348,19 +366,39 @@ func StringToLogLevel(level string) LogLevel {
 }
 
 func LogTypeToString(t LogType) (string, string) {
-	switch t {
-	case LOG_FATAL:
-		return "fatal", "[0;31"
-	case LOG_ERROR:
-		return "error", "[0;31"
-	case LOG_WARNING:
-		return "warning", "[0;33"
-	case LOG_DEBUG:
-		return "debug", "[0;36"
-	case LOG_INFO:
-		return "info", "[0;37"
+	genLogColor := func(combination int) string {
+		return fmt.Sprintf("%x", combination)
 	}
-	return "unknown", "[0;37"
+
+	if runtime.GOOS == "windows" {
+		switch t {
+		case LOG_FATAL:
+			return "fatal", genLogColor(0x040)
+		case LOG_ERROR:
+			return "error", genLogColor(0x01 | 0x04)
+		case LOG_WARNING:
+			return "warning", genLogColor(0x06)
+		case LOG_DEBUG:
+			return "debug", genLogColor(0x02)
+		case LOG_INFO:
+			return "info", genLogColor(0x01 | 0x02 | 0x04)
+		}
+		return "unknown", genLogColor(0x01 | 0x02 | 0x04)
+	} else {
+		switch t {
+		case LOG_FATAL:
+			return "fatal", "[0;31"
+		case LOG_ERROR:
+			return "error", "[0;31"
+		case LOG_WARNING:
+			return "warning", "[0;33"
+		case LOG_DEBUG:
+			return "debug", "[0;36"
+		case LOG_INFO:
+			return "info", "[0;37"
+		}
+		return "unknown", "[0;37"
+	}
 }
 
 func genDayTime(t time.Time) string {

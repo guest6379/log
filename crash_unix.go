@@ -16,3 +16,11 @@ func CrashLog(file string) {
 		syscall.Dup2(int(f.Fd()), 2)
 	}
 }
+
+func SetConsoleColor(t LogType) string {
+	return ""
+}
+
+func ResetConsoleColor() {
+
+}
